@@ -29,7 +29,7 @@ async def Facerecognize(file1: UploadFile = File(...), file2: UploadFile = File(
         encoding1 = calculate_face_encoding(temp_file1_path)
         encoding2 = calculate_face_encoding(temp_file2_path)
 
-        match = face_recognition.Facerecognize([encoding1], encoding2)[0]
+        match = face_recognition.compare_faces([encoding1], encoding2)[0]
 
         # Clean up temporary files
         os.remove(temp_file1_path)
@@ -40,6 +40,10 @@ async def Facerecognize(file1: UploadFile = File(...), file2: UploadFile = File(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Face Recognition API"}
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host='0.0.0.0', port=8000)
