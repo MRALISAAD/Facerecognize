@@ -1,12 +1,29 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
 import face_recognition
 import numpy as np
-import tempfile
 import os
+import shutil
 
 app = FastAPI()
 
+# Allow all origins
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Pydantic model for image upload
+class ImageUpload(BaseModel):
+    image: UploadFile
+
+# Function to calculate face encoding from image file
 def calculate_face_encoding(file_path):
     image = face_recognition.load_image_file(file_path)
     face_locations = face_recognition.face_locations(image)
@@ -15,35 +32,26 @@ def calculate_face_encoding(file_path):
     face_encodings = face_recognition.face_encodings(image, face_locations)
     return face_encodings[0]
 
-@app.post("/api/Facerecognize")
-async def Facerecognize(file1: UploadFile = File(...), file2: UploadFile = File(...)):
+# Endpoint for face recognition
+@app.post('/facerecognize')
+async def recognize_faces(image: UploadFile = File(...)):
     try:
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file1:
-            temp_file1.write(await file1.read())
-            temp_file1_path = temp_file1.name
+        # Save the uploaded image to a temporary file
+        temp_file = f"./temp/{image.filename}"
+        with open(temp_file, "wb") as temp_image:
+            shutil.copyfileobj(image.file, temp_image)
 
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file2:
-            temp_file2.write(await file2.read())
-            temp_file2_path = temp_file2.name
+        # Calculate face encoding from the uploaded image
+        face_encoding = calculate_face_encoding(temp_file)
 
-        encoding1 = calculate_face_encoding(temp_file1_path)
-        encoding2 = calculate_face_encoding(temp_file2_path)
+        # Cleanup: delete temporary file
+        os.remove(temp_file)
 
-        match = face_recognition.compare_faces([encoding1], encoding2)[0]
-
-        # Clean up temporary files
-        os.remove(temp_file1_path)
-        os.remove(temp_file2_path)
-
-        return {"match": match}
+        # Return face encoding as response (for demonstration)
+        return {"face_encoding": face_encoding.tolist()}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the Face Recognition API"}
-
-if __name__ == "__main__":
-    import uvicorn
+if __name__ == '__main__':
     uvicorn.run(app, host='0.0.0.0', port=8000)
